@@ -1,6 +1,5 @@
 // Based on https://github.com/phosphorjs/phosphor/blob/master/packages/signaling/src/index.ts
 
-import {logger} from "./logging"
 import {defer} from "./util/callback"
 import {find, removeBy} from "./util/array"
 
@@ -145,27 +144,11 @@ export namespace Signal {
 
 export interface Signalable {
   connect<Args, Sender extends object>(this: object, signal: Signal<Args, Sender>, slot: Slot<Args, Sender>): boolean
-  listenTo<Args, Sender extends object>(this: object, event: string, slot: Slot<Args, Sender>): boolean
-  trigger<Args>(this: object, event: string, args: Args): void
 }
 
 export namespace Signalable {
   export function connect<Args, Sender extends object>(this: object, signal: Signal<Args, Sender>, slot: Slot<Args, Sender>): boolean {
     return signal.connect(slot, this)
-  }
-
-  export function listenTo<Args, Sender extends object>(this: object, event: string, slot: Slot<Args, Sender>): boolean {
-    logger.warn("obj.listenTo('event', handler) is deprecated, use obj.connect(signal, slot)")
-    const [name, attr] = event.split(":")
-    const signal = (attr == null) ? (this as any)[name] : (this as any).properties[attr][name]
-    return (signal as Signal<Args, Sender>).connect(slot, this)
-  }
-
-  export function trigger<Args>(this: object, event: string, args: Args): void {
-    logger.warn("obj.trigger('event', args) is deprecated, use signal.emit(args)")
-    const [name, attr] = event.split(":")
-    const signal = (attr == null) ? (this as any)[name] : (this as any).properties[attr][name]
-    return (signal as Signal<Args, any>).emit(args)
   }
 }
 
