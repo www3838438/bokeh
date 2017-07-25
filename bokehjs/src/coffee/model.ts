@@ -1,72 +1,108 @@
-import {HasProps} from "./core/has_props"
+import {HasProps, IHasProps} from "./core/has_props"
 import * as p from "./core/properties"
 import {isString} from "./core/util/types"
 import {isEmpty} from "./core/util/object"
 import {logger} from "./core/logging"
+import {CustomJS} from "./models/callbacks/customjs"
 
-export class Model extends HasProps
-  type: "Model"
+export interface IModel extends IHasProps {
+  tags:                  string[]
+  name:                  string
+  js_property_callbacks: {[key: string]: CustomJS}
+  js_event_callbacks:    {[key: string]: CustomJS}
+  subscribed_events:     string[]
+}
 
-  @define {
-    tags:                  [ p.Array, [] ]
-    name:                  [ p.String    ]
-    js_property_callbacks: [ p.Any,   {} ]
-    js_event_callbacks:    [ p.Any,   {} ]
-    subscribed_events:     [ p.Array, [] ]
-  }
+/*
+export class ModelMeta extends HasPropsMeta {
+  tags                  = new p.Array([])
+  name                  = new p.String()
+  js_property_callbacks = new p.Dict({})
+  js_event_callbacks    = new p.Dict({})
+  subscribed_events     = new p.Array([])
+}
+*/
 
-  connect_signals: () ->
+export class Model extends HasProps implements IModel {
+  type = "Model"
+
+  /*
+  get tags(): string[] { return this.props.tags.getv() }
+  set tags(value: string[]) { this.props.tags.setv(value) }
+  */
+
+  tags:                  [ p.Array, [] ]
+  name:                  [ p.String    ]
+  js_property_callbacks: [ p.Any,   {} ]
+  js_event_callbacks:    [ p.Any,   {} ]
+  subscribed_events:     [ p.Array, [] ]
+
+  connect_signals() {
     super()
 
-    for evt, callbacks of @js_property_callbacks
-      [evt, attr=null] = evt.split(':')
-      for cb in callbacks
-        if attr != null
-          @connect(@properties[attr][evt], () -> cb.execute(@))
-        else
-          @connect(@[evt], () -> cb.execute(@))
+    for (const evt in this.js_property_callbacks) {
+      const callbacks = this.js_property_callbacks[evt]
+      const [name, attr] = evt.split(':')
 
-    @connect(@properties.js_event_callbacks.change, () -> @_update_event_callbacks)
-    @connect(@properties.subscribed_events.change, () -> @_update_event_callbacks)
+      for (const cb of callbacks) {
+        const ref = (attr != null) ? this.properties[attr] : this
+        this.connect(ref[name], () => cb.execute(this))
+      }
+    }
 
-  _process_event: (event) ->
-    if event.is_applicable_to(this)
-      event = event._customize_event(@)
+    this.connect(this.properties.js_event_callbacks.change, () => this._update_event_callbacks())
+    this.connect(this.properties.subscribed_events.change, () => this._update_event_callbacks())
+  }
 
-      for callback in @js_event_callbacks[event.event_name] ? []
+  private _process_event(event): void {
+    if (event.is_applicable_to(this)) {
+      const event = event._customize_event(this)
+
+      for (const callback of this.js_event_callbacks[event.event_name] || []) {
         callback.execute(event, {})
+      }
 
-      if @subscribed_events.some((m) -> m == event.event_name)
-        @document.event_manager.send_event(event)
+      if (this.subscribed_events.some((m) => m === event.event_name))
+        this.document.event_manager.send_event(event)
+    }
+  }
 
-  trigger_event: (event) ->
-    @document?.event_manager.trigger(event.set_model_id(@id))
+  trigger_event(event): void {
+    if (this.document != null)
+      this.document.event_manager.trigger(event.set_model_id(this.id))
+  }
 
-  _update_event_callbacks: () ->
-    if not @document?
-      # File an issue: SidePanel in particular seems to have this issue
+  _update_event_callbacks(): void {
+    if (this.document == null) {
+      // File an issue: SidePanel in particular seems to have this issue
       logger.warn('WARNING: Document not defined for updating event callbacks')
-      return
-    @document.event_manager.subscribed_models.push(@id)
+    } else
+      this.document.event_manager.subscribed_models.push(this.id)
+  }
 
-  _doc_attached: () ->
-    if not isEmpty(@js_event_callbacks) or not isEmpty(@subscribed_events)
-      @_update_event_callbacks()
+  _doc_attached() {
+    if (!isEmpty(this.js_event_callbacks) || !isEmpty(this.subscribed_events))
+      this._update_event_callbacks()
+  }
 
-  select: (selector) ->
-    if selector.prototype instanceof Model
-      @references().filter((ref) -> ref instanceof selector)
-    else if isString(selector)
-      @references().filter((ref) -> ref.name == selector)
+  select(selector: Class<HasProps> | string): HasProps[] {
+    if (selector.prototype instanceof HasProps)
+      return this.references().filter((ref) => ref instanceof selector)
+    else if (isString(selector))
+      return this.references().filter((ref) => ref.name === selector)
     else
       throw new Error("invalid selector")
+  }
 
-  select_one: (selector) ->
-    result = @select(selector)
-    switch result.length
-      when 0
-        null
-      when 1
-        result[0]
-      else
+  select_one(selector: Class<HasProps> | string): HasProps {
+    const result = this.select(selector)
+    switch (result.length) {
+      case 0:
+        return null
+      case 1:
+        return result[0]
+      default:
         throw new Error("found more than one object matching given selector")
+    }
+  }
+}
