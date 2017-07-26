@@ -1,5 +1,6 @@
 // Based on https://github.com/phosphorjs/phosphor/blob/master/packages/signaling/src/index.ts
 
+import {Constructor} from "./common"
 import {defer} from "./util/callback"
 import {find, removeBy} from "./util/array"
 
@@ -142,13 +143,15 @@ export namespace Signal {
   }
 }
 
-export interface Signalable {
-  connect<Args, Sender extends object>(this: object, signal: Signal<Args, Sender>, slot: Slot<Args, Sender>): boolean
+export interface ISignalable {
+  connect<Args, Sender extends object>(signal: Signal<Args, Sender>, slot: Slot<Args, Sender>): boolean
 }
 
-export namespace Signalable {
-  export function connect<Args, Sender extends object>(this: object, signal: Signal<Args, Sender>, slot: Slot<Args, Sender>): boolean {
-    return signal.connect(slot, this)
+export const Signalable = <C extends Constructor>(Base: C) => {
+  return class extends Base implements ISignalable {
+    connect<Args, Sender extends object>(signal: Signal<Args, Sender>, slot: Slot<Args, Sender>): boolean {
+      return signal.connect(slot, this)
+    }
   }
 }
 
