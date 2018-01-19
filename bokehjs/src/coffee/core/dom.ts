@@ -173,4 +173,5 @@ export enum Keys {
   PageDown  = 34,
   Up        = 38,
   Down      = 40,
+  Delete    = 42
 }
