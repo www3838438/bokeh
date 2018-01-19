@@ -165,11 +165,12 @@ export function margin(el: HTMLElement): Sizing {
 }
 
 export enum Keys {
-  Tab      = 9,
-  Enter    = 13,
-  Esc      = 27,
-  PageUp   = 33,
-  PageDown = 34,
-  Up       = 38,
-  Down     = 40,
+  Backspace = 8,
+  Tab       = 9,
+  Enter     = 13,
+  Esc       = 27,
+  PageUp    = 33,
+  PageDown  = 34,
+  Up        = 38,
+  Down      = 40,
 }
